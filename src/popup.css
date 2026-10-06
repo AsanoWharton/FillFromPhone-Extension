@@ -1,0 +1,39 @@
+@font-face { font-family: "Public Sans"; src: url("public-sans-400.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "Public Sans"; src: url("public-sans-700.woff2") format("woff2"); font-weight: 700 900; font-style: normal; }
+
+:root {
+  color-scheme: light;
+  --ink: #1b1b1b;
+  --muted: #565c65;
+  --accent: #146c68;
+  --accent-dark: #0d514e;
+  --accent-light: #deeeea;
+  --gray: #f2efe8;
+  --line: #cbc8bf;
+  --focus: #f2b84b;
+  font-family: "Public Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: #fff;
+}
+
+* { box-sizing: border-box; }
+body { width: 350px; margin: 0; border-top: .4rem solid var(--accent); }
+main { padding: 1.1rem; }
+.eyebrow { margin: 0 0 .35rem; color: var(--accent-dark); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+h1 { margin: 0; color: var(--ink); font-size: 1.55rem; }
+.intro { margin: .45rem 0 1rem; color: var(--muted); line-height: 1.45; }
+ol { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
+li { display: flex; align-items: center; gap: .65rem; }
+li span { display: grid; flex: 0 0 1.55rem; height: 1.55rem; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; }
+li p { margin: 0; line-height: 1.35; }
+.status { display: flex; align-items: center; gap: .55rem; margin: 1rem 0; padding: .7rem .8rem; border-left: .3rem solid var(--accent); background: var(--gray); }
+.status-dot { width: .6rem; height: .6rem; border-radius: 50%; background: #71767a; }
+.status-dot.ready { background: #008817; }
+.status-dot.unavailable { background: #b50909; }
+.boundaries { padding: .9rem; border: 1px solid var(--line); }
+h2 { margin: 0 0 .3rem; color: var(--ink); font-size: .92rem; }
+.boundaries p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+nav { display: flex; flex-wrap: wrap; gap: 0 1rem; }
+a { display: inline-block; margin-top: .9rem; color: var(--accent-dark); font-weight: 750; text-decoration: underline; text-underline-offset: .18em; }
+a:hover { color: var(--ink); }
+a:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }

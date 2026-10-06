@@ -1,0 +1,12 @@
+Fill from Phone application code, protocol implementation, documentation,
+visual assets, and product-specific materials are proprietary. All rights are
+reserved. No license to copy, modify, redistribute, sublicense, create
+derivative works from, or commercially use those materials is granted except
+by a separate written agreement or as required by applicable law.
+
+Commercial evaluation, integration, and licensing terms may be available under
+a separate written agreement. Contact contact@asanowharton.com for licensing
+inquiries.
+
+Third-party components remain subject to the separate license files included
+with this package. Those licenses do not license Fill from Phone itself.

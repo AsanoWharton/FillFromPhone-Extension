@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fill from Phone</title>
+    <link rel="stylesheet" href="popup.css">
+    <script src="popup.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">One-time encrypted transfer</p>
+        <h1>Fill from Phone</h1>
+        <p class="intro">Move one value from your phone into one selected Chrome field.</p>
+      </header>
+
+      <ol aria-label="How to use Fill from Phone">
+        <li><span>1</span><p>Focus or right-click an editable field.</p></li>
+        <li><span>2</span><p>Choose <strong>Fill from Phone</strong>.</p></li>
+        <li><span>3</span><p>Scan the QR, enter the text, and send.</p></li>
+      </ol>
+
+      <section class="status" aria-live="polite">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-copy">Checking relay…</span>
+      </section>
+
+      <section class="boundaries">
+        <h2>What crosses the bridge</h2>
+        <p>Only the value you choose is encrypted and relayed for the active transfer. The service receives ciphertext and short-lived session data, not readable field content.</p>
+      </section>
+
+      <nav aria-label="Extension help">
+        <a href="https://fillfromphone.com/test" target="_blank" rel="noreferrer">Open test page</a>
+        <a href="https://fillfromphone.com" target="_blank" rel="noreferrer">How it works</a>
+        <a href="https://fillfromphone.com/privacy" target="_blank" rel="noreferrer">Privacy</a>
+      </nav>
+    </main>
+  </body>
+</html>

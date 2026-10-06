@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Fill from Phone",
+  "version": "0.6.2",
+  "description": "Transfer one value from a phone into one selected field with end-to-end encryption.",
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "permissions": ["activeTab", "contextMenus", "scripting"],
+  "host_permissions": ["https://fillfromphone.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://fillfromphone.com/test"],
+      "js": ["presence.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "Fill from Phone",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png"
+    },
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
+  "minimum_chrome_version": "120"
+}

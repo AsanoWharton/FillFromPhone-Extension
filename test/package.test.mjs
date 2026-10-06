@@ -1,0 +1,66 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import { unzipSync } from "fflate";
+
+test("packaged extension contains only the reviewed runtime files", async () => {
+  const archive = new Uint8Array(await readFile(new URL("../release/fill-from-phone-extension.zip", import.meta.url)));
+  const unpacked = unzipSync(archive);
+  const entries = Object.keys(unpacked).sort();
+  assert.deepEqual(entries, ["LICENSE-dijkstrajs.txt", "LICENSE-font-awesome.txt", "LICENSE-public-sans.txt", "LICENSE-qrcode.txt", "PROPRIETARY-NOTICE.txt", "background.js", "content.js", "icon-128.png", "icon-16.png", "icon-32.png", "icon-48.png", "manifest.json", "popup.css", "popup.html", "popup.js", "presence.js", "public-sans-400.woff2", "public-sans-700.woff2"]);
+  assert.match(new TextDecoder().decode(unpacked["PROPRIETARY-NOTICE.txt"]), /proprietary\. All rights are\s+reserved/u);
+  assert.match(new TextDecoder().decode(unpacked["LICENSE-font-awesome.txt"]), /Creative Commons\s+Attribution 4\.0/u);
+});
+
+test("manifest retains the minimum permission set", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../dist/manifest.json", import.meta.url), "utf8"));
+  assert.deepEqual(manifest.permissions.sort(), ["activeTab", "contextMenus", "scripting"]);
+  assert.equal(manifest.version, "0.6.2");
+  assert.deepEqual(manifest.host_permissions, ["https://fillfromphone.com/*"]);
+  assert.equal(manifest.action.default_popup, "popup.html");
+  assert.deepEqual(manifest.icons, { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" });
+  assert.deepEqual(manifest.action.default_icon, { "16": "icon-16.png", "32": "icon-32.png" });
+  assert.deepEqual(manifest.content_scripts, [{ matches: ["https://fillfromphone.com/test"], js: ["presence.js"], run_at: "document_start" }]);
+  assert.equal(manifest.externally_connectable, undefined);
+});
+
+test("extension icon has the required dimensions and transparent padding", async () => {
+  const icon = await readFile(new URL("../dist/icon-128.png", import.meta.url));
+  assert.equal(icon.readUInt32BE(16), 128);
+  assert.equal(icon.readUInt32BE(20), 128);
+  assert.equal(icon[25], 6);
+});
+
+test("versioned and generic release archives are byte-identical", async () => {
+  const genericArchive = await readFile(new URL("../release/fill-from-phone-extension.zip", import.meta.url));
+  const versionedArchive = await readFile(new URL("../release/fill-from-phone-0.6.2-chrome-web-store.zip", import.meta.url));
+  assert.ok(genericArchive.byteLength > 0);
+  assert.deepEqual(versionedArchive, genericArchive);
+});
+
+test("first install opens the same-origin test page", async () => {
+  const background = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
+  const presence = await readFile(new URL("../dist/presence.js", import.meta.url), "utf8");
+  assert.match(background, /https:\/\/fillfromphone\.com\/test/u);
+  assert.match(background, /reason===?"install"/u);
+  assert.match(presence, /data-fill-from-phone-extension/u);
+  assert.doesNotMatch(presence, /fetch\(|XMLHttpRequest|chrome\.runtime|chrome\.tabs|chrome\.scripting|localStorage|sessionStorage|indexedDB/u);
+});
+
+test("only the extension service worker performs relay networking", async () => {
+  const background = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
+  const content = await readFile(new URL("../dist/content.js", import.meta.url), "utf8");
+  const backgroundSource = await readFile(new URL("../src/background.ts", import.meta.url), "utf8");
+  assert.match(background, /\/v1\/session/u);
+  assert.match(content, /FFP_RELAY_RESERVE/u);
+  assert.doesNotMatch(content, /\/v1\/session/u);
+  assert.doesNotMatch(`${background}\n${content}`, /X25519/u);
+  assert.match(content, /Short text field/u);
+  assert.match(content, /Long text field/u);
+  assert.match(content, /Password field/u);
+  assert.match(content, /Fill from Phone/u);
+  assert.doesNotMatch(content, /Secure device handoff|class="key"/u);
+  assert.equal((backgroundSource.match(/token\((?:message|candidate)\.id, 43\)/gu) ?? []).length, 4);
+  assert.doesNotMatch(backgroundSource, /token\((?:message|candidate)\.id, 46\)/u);
+  assert.doesNotMatch(backgroundSource, /\.then\(/u);
+});

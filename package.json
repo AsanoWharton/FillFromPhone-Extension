@@ -1,0 +1,26 @@
+{
+  "name": "@fill-from-phone/extension",
+  "version": "0.6.2",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc -p tsconfig.json --noEmit && npm run test",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@fontsource/public-sans": "^5.3.0",
+    "@fortawesome/free-solid-svg-icons": "^7.3.1",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/chrome": "^0.1.0",
+    "@types/qrcode": "^1.5.5",
+    "esbuild": "^0.25.0",
+    "fflate": "^0.8.2",
+    "qrcode": "^1.5.4",
+    "typescript": "^5.9.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}
