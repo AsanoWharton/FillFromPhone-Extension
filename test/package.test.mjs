@@ -41,7 +41,7 @@ test("versioned and generic release archives are byte-identical", async () => {
 test("first install opens the same-origin test page", async () => {
   const background = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
   const presence = await readFile(new URL("../dist/presence.js", import.meta.url), "utf8");
-  assert.match(background, /https:\/\/fillfromphone\.com\/test/u);
+  assert.equal(background.includes("https://fillfromphone.com/test"), true);
   assert.match(background, /reason===?"install"/u);
   assert.match(presence, /data-fill-from-phone-extension/u);
   assert.doesNotMatch(presence, /fetch\(|XMLHttpRequest|chrome\.runtime|chrome\.tabs|chrome\.scripting|localStorage|sessionStorage|indexedDB/u);
