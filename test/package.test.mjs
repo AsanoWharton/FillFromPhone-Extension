@@ -81,9 +81,10 @@ test("terminal transfer state and transport budgets guard the plaintext sink", a
   const cancelIndex = contentSource.indexOf("if (active) await cancel(active)", failureIndex);
   const cleanupIndex = contentSource.indexOf("clearRuntimeIfOwned(lifecycle)", cancelIndex);
   assert.ok(failureIndex > injectIndex && cancelIndex > failureIndex && cleanupIndex > cancelIndex);
-  const claimedIndex = contentSource.indexOf("runtime.__fillFromPhoneClaimed");
+  const claimedIndex = contentSource.indexOf("runtime.__fillFromPhoneClaimed = (id) => {");
   const claimedCancelIndex = contentSource.indexOf("void cancel(active)", claimedIndex);
-  assert.ok(claimedIndex >= 0 && claimedCancelIndex > claimedIndex && claimedCancelIndex < decryptIndex);
+  const claimedHandlerEndIndex = contentSource.indexOf("    };", claimedIndex);
+  assert.ok(claimedIndex >= 0 && claimedCancelIndex > claimedIndex && claimedCancelIndex < claimedHandlerEndIndex);
   assert.match(contentSource, /expiresAt: transaction\.bootstrap\.expiresAt/u);
   assert.match(backgroundSource, /readBoundedJson\(/u);
   assert.match(backgroundSource, /readBoundedSse\(/u);
