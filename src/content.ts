@@ -1,10 +1,17 @@
 import QRCode from "qrcode";
 import { bootstrapUrl, createDesktopTransaction, decryptEnvelope, type DesktopTransaction, type Envelope, type FieldKind } from "./protocol.js";
+import {
+  assertTransferActive,
+  cancelTransfer,
+  createTransferLifecycle,
+  releasePlaintext,
+  type TransferLifecycle
+} from "./transfer-lifecycle.js";
 
 declare const __SERVICE_ORIGIN__: string;
 
 interface ActiveTransfer {
-  controller: AbortController;
+  lifecycle: TransferLifecycle;
   transaction: DesktopTransaction;
   target: HTMLElement;
   documentRef: Document;
@@ -22,6 +29,7 @@ const runtime = globalThis as typeof globalThis & {
   __fillFromPhoneInstalled?: boolean;
   __fillFromPhoneCancel?: () => void;
   __fillFromPhoneClaimed?: (id: string) => void;
+  __fillFromPhoneToken?: object;
 };
 
 function deepestActiveElement(root: Document | ShadowRoot = document): Element | null {
@@ -104,7 +112,8 @@ async function waitForEnvelope(transaction: DesktopTransaction): Promise<Envelop
       type: "FFP_RELAY_WAIT",
       id: transaction.bootstrap.id,
       slot: transaction.bootstrap.slot,
-      readToken: transaction.readToken
+      readToken: transaction.readToken,
+      expiresAt: transaction.bootstrap.expiresAt
     });
     if (!response.envelope) throw new Error("relay returned no envelope");
     return response.envelope;
@@ -129,9 +138,9 @@ function inject(target: HTMLElement, plaintext: Uint8Array): void {
 }
 
 async function cancel(active: ActiveTransfer): Promise<void> {
-  active.controller.abort();
+  cancelTransfer(active.lifecycle);
   active.overlay.remove();
-  delete runtime.__fillFromPhoneClaimed;
+  if (runtime.__fillFromPhoneToken === active.lifecycle.token) delete runtime.__fillFromPhoneClaimed;
   try {
     await relayMessage({
       type: "FFP_RELAY_CANCEL",
@@ -144,16 +153,48 @@ async function cancel(active: ActiveTransfer): Promise<void> {
   }
 }
 
+function assertTransferContext(active: ActiveTransfer, fieldKind: FieldKind): void {
+  assertTransferActive(
+    active.lifecycle,
+    runtime.__fillFromPhoneToken,
+    active.transaction.bootstrap.expiresAt
+  );
+  if (
+    document !== active.documentRef || location.origin !== active.origin ||
+    !active.target.isConnected || !isEditable(active.target) || fieldKindFor(active.target) !== fieldKind
+  ) throw new Error("target context changed");
+}
+
+function clearRuntimeIfOwned(lifecycle: TransferLifecycle): void {
+  if (runtime.__fillFromPhoneToken !== lifecycle.token) return;
+  delete runtime.__fillFromPhoneCancel;
+  delete runtime.__fillFromPhoneClaimed;
+  delete runtime.__fillFromPhoneToken;
+}
+
 async function startTransfer(): Promise<void> {
-  runtime.__fillFromPhoneCancel?.();
+  const previousCancel = runtime.__fillFromPhoneCancel;
+  const token = {};
+  runtime.__fillFromPhoneToken = token;
+  previousCancel?.();
   const target = deepestActiveElement();
   if (!isEditable(target)) {
+    if (runtime.__fillFromPhoneToken === token) {
+      delete runtime.__fillFromPhoneCancel;
+      delete runtime.__fillFromPhoneClaimed;
+      delete runtime.__fillFromPhoneToken;
+    }
     showNotice("Focus a supported text field, then try Fill from Phone again.");
     return;
   }
   const origin = location.origin;
   const localDevelopment = location.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
   if (location.protocol !== "https:" && !localDevelopment) {
+    if (runtime.__fillFromPhoneToken === token) {
+      delete runtime.__fillFromPhoneCancel;
+      delete runtime.__fillFromPhoneClaimed;
+      delete runtime.__fillFromPhoneToken;
+    }
     showNotice("Fill from Phone requires a secure HTTPS page.");
     return;
   }
@@ -161,16 +202,22 @@ async function startTransfer(): Promise<void> {
   const documentRef = document;
   const ui = overlayElement(fieldKind, location.host);
   document.documentElement.append(ui.host);
-  const controller = new AbortController();
+  const lifecycle = createTransferLifecycle(token);
   let active: ActiveTransfer | undefined;
   let timer: number | undefined;
 
   try {
     const transaction = await createDesktopTransaction(origin, Date.now(), fieldKind);
-    active = { controller, transaction, target, documentRef, origin, overlay: ui.host };
+    assertTransferActive(lifecycle, runtime.__fillFromPhoneToken, transaction.bootstrap.expiresAt);
+    active = { lifecycle, transaction, target, documentRef, origin, overlay: ui.host };
     runtime.__fillFromPhoneCancel = () => { if (active) void cancel(active); };
     runtime.__fillFromPhoneClaimed = (id) => {
       if (!active || active.transaction.bootstrap.id !== id) return;
+      try {
+        assertTransferContext(active, fieldKind);
+      } catch {
+        return;
+      }
       if (timer !== undefined) window.clearInterval(timer);
       timer = undefined;
       ui.canvas.remove();
@@ -179,7 +226,9 @@ async function startTransfer(): Promise<void> {
     };
     ui.cancel.addEventListener("click", () => { if (active) void cancel(active); }, { once: true });
     await reserve(transaction);
+    assertTransferContext(active, fieldKind);
     await QRCode.toCanvas(ui.canvas, bootstrapUrl(__SERVICE_ORIGIN__, transaction.bootstrap), { width: 320, margin: 4, errorCorrectionLevel: "M", color: { dark: "#0d514e", light: "#ffffff" } });
+    assertTransferContext(active, fieldKind);
     ui.status.textContent = "Scan to continue on your phone";
     const updateTimer = (): void => {
       const seconds = Math.max(0, Math.ceil((transaction.bootstrap.expiresAt - Date.now()) / 1_000));
@@ -191,30 +240,32 @@ async function startTransfer(): Promise<void> {
     timer = window.setInterval(updateTimer, 250);
     const envelope = await waitForEnvelope(transaction);
     if (timer !== undefined) window.clearInterval(timer);
-    if (
-      Date.now() >= transaction.bootstrap.expiresAt || document !== documentRef ||
-      location.origin !== origin || !target.isConnected || !isEditable(target) || fieldKindFor(target) !== fieldKind
-    ) throw new Error("target context changed");
+    assertTransferContext(active, fieldKind);
     const plaintext = await decryptEnvelope(transaction, envelope);
-    try {
-      inject(target, plaintext);
-    } finally {
-      plaintext.fill(0);
-    }
+    releasePlaintext(
+      lifecycle,
+      runtime.__fillFromPhoneToken,
+      transaction.bootstrap.expiresAt,
+      plaintext,
+      () => {
+        assertTransferContext(active!, fieldKind);
+        inject(target, plaintext);
+      }
+    );
     ui.status.textContent = "Filled";
     ui.timer.textContent = "Review the field before submitting.";
     window.setTimeout(() => ui.host.remove(), 1_500);
     active = undefined;
-    delete runtime.__fillFromPhoneCancel;
-    delete runtime.__fillFromPhoneClaimed;
+    clearRuntimeIfOwned(lifecycle);
   } catch {
-    if (!controller.signal.aborted) {
+    if (!lifecycle.controller.signal.aborted && runtime.__fillFromPhoneToken === token) {
       ui.status.textContent = "Transfer stopped";
       ui.timer.textContent = "Start a new transfer and try again.";
       window.setTimeout(() => ui.host.remove(), 2_500);
-    }
+    } else ui.host.remove();
   } finally {
     if (timer !== undefined) window.clearInterval(timer);
+    clearRuntimeIfOwned(lifecycle);
   }
 }
 

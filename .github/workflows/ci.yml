@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   verify:
-    name: Verify immutable 0.6.2 source
+    name: Verify extension source
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
