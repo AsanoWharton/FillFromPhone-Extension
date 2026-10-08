@@ -15,7 +15,7 @@ test("packaged extension contains only the reviewed runtime files", async () => 
 test("manifest retains the minimum permission set", async () => {
   const manifest = JSON.parse(await readFile(new URL("../dist/manifest.json", import.meta.url), "utf8"));
   assert.deepEqual(manifest.permissions.sort(), ["activeTab", "contextMenus", "scripting"]);
-  assert.equal(manifest.version, "0.6.3");
+  assert.equal(manifest.version, "0.6.4");
   assert.deepEqual(manifest.host_permissions, ["https://fillfromphone.com/*"]);
   assert.equal(manifest.action.default_popup, "popup.html");
   assert.deepEqual(manifest.icons, { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" });
@@ -33,7 +33,7 @@ test("extension icon has the required dimensions and transparent padding", async
 
 test("versioned and generic release archives are byte-identical", async () => {
   const genericArchive = await readFile(new URL("../release/fill-from-phone-extension.zip", import.meta.url));
-  const versionedArchive = await readFile(new URL("../release/fill-from-phone-0.6.3-chrome-web-store.zip", import.meta.url));
+  const versionedArchive = await readFile(new URL("../release/fill-from-phone-0.6.4-chrome-web-store.zip", import.meta.url));
   assert.ok(genericArchive.byteLength > 0);
   assert.deepEqual(versionedArchive, genericArchive);
 });
@@ -66,9 +66,11 @@ test("only the extension service worker performs relay networking", async () => 
 });
 
 test("terminal transfer state and transport budgets guard the plaintext sink", async () => {
-  const [backgroundSource, contentSource] = await Promise.all([
+  const [backgroundSource, contentSource, popupSource, boundedSource] = await Promise.all([
     readFile(new URL("../src/background.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/content.ts", import.meta.url), "utf8")
+    readFile(new URL("../src/content.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/popup.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/bounded-response.ts", import.meta.url), "utf8")
   ]);
   const decryptIndex = contentSource.indexOf("const plaintext = await decryptEnvelope");
   const releaseIndex = contentSource.indexOf("releasePlaintext(", decryptIndex);
@@ -79,6 +81,9 @@ test("terminal transfer state and transport budgets guard the plaintext sink", a
   const cancelIndex = contentSource.indexOf("if (active) await cancel(active)", failureIndex);
   const cleanupIndex = contentSource.indexOf("clearRuntimeIfOwned(lifecycle)", cancelIndex);
   assert.ok(failureIndex > injectIndex && cancelIndex > failureIndex && cleanupIndex > cancelIndex);
+  const claimedIndex = contentSource.indexOf("runtime.__fillFromPhoneClaimed");
+  const claimedCancelIndex = contentSource.indexOf("void cancel(active)", claimedIndex);
+  assert.ok(claimedIndex >= 0 && claimedCancelIndex > claimedIndex && claimedCancelIndex < decryptIndex);
   assert.match(contentSource, /expiresAt: transaction\.bootstrap\.expiresAt/u);
   assert.match(backgroundSource, /readBoundedJson\(/u);
   assert.match(backgroundSource, /readBoundedSse\(/u);
@@ -86,4 +91,5 @@ test("terminal transfer state and transport budgets guard the plaintext sink", a
     backgroundSource.indexOf("relayControllers.get(id)?.abort()", backgroundSource.indexOf("async function cancelRelay")) <
     backgroundSource.indexOf("if (message.slot === undefined) return", backgroundSource.indexOf("async function cancelRelay"))
   );
+  assert.doesNotMatch(`${backgroundSource}\n${popupSource}\n${boundedSource}`, /AbortSignal\.(?:any|timeout)/u);
 });

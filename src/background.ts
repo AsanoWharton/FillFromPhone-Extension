@@ -2,7 +2,7 @@ declare const __SERVICE_ORIGIN__: string;
 export {};
 
 import {
-  deadlineSignal,
+  armDeadline,
   MAX_RESERVATION_RESPONSE_BYTES,
   readBoundedJson,
   readBoundedSse
@@ -66,6 +66,7 @@ async function reserveRelay(message: Record<string, unknown>): Promise<"B" | "G"
   relayControllers.get(id)?.abort();
   const controller = new AbortController();
   relayControllers.set(id, controller);
+  const clearDeadline = armDeadline(controller, expiresAt);
   try {
     const body = JSON.stringify({
       id,
@@ -78,7 +79,7 @@ async function reserveRelay(message: Record<string, unknown>): Promise<"B" | "G"
       cache: "no-store",
       credentials: "omit",
       referrerPolicy: "no-referrer",
-      signal: deadlineSignal(controller, expiresAt),
+      signal: controller.signal,
       headers: { "Content-Type": "application/json" },
       body
     });
@@ -87,7 +88,7 @@ async function reserveRelay(message: Record<string, unknown>): Promise<"B" | "G"
       response,
       MAX_RESERVATION_RESPONSE_BYTES,
       controller,
-      deadlineSignal(controller, expiresAt)
+      controller.signal
     ));
     const assignedSlot = slot(result.slot);
     if (result.status !== "reserved") throw new Error("invalid reserve response");
@@ -95,6 +96,8 @@ async function reserveRelay(message: Record<string, unknown>): Promise<"B" | "G"
   } catch (error) {
     if (relayControllers.get(id) === controller) relayControllers.delete(id);
     throw error;
+  } finally {
+    clearDeadline();
   }
 }
 
@@ -105,18 +108,18 @@ async function waitForRelay(message: Record<string, unknown>, sender: chrome.run
   const expiresAt = expiry(message.expiresAt);
   const controller = relayControllers.get(id) ?? new AbortController();
   relayControllers.set(id, controller);
+  const clearDeadline = armDeadline(controller, expiresAt);
   try {
-    const signal = deadlineSignal(controller, expiresAt);
     const response = await fetch(`${__SERVICE_ORIGIN__}/v1/${assignedSlot}/session/${id}/events`, {
       method: "GET",
       cache: "no-store",
       credentials: "omit",
       referrerPolicy: "no-referrer",
-      signal,
+      signal: controller.signal,
       headers: { "X-Read-Token": readToken }
     });
     if (!response.ok || !response.body) throw new Error("relay unavailable");
-    return await readBoundedSse(response, controller, signal, (event) => {
+    return await readBoundedSse(response, controller, controller.signal, (event) => {
       const lines = event.replaceAll("\r\n", "\n").split("\n");
       const eventNames = lines.filter((line) => line.startsWith("event:")).map((line) => line.slice(6).trimStart());
       if (eventNames.length > 1) throw new Error("invalid event");
@@ -141,6 +144,7 @@ async function waitForRelay(message: Record<string, unknown>, sender: chrome.run
       return envelope(JSON.parse(data));
     });
   } finally {
+    clearDeadline();
     if (relayControllers.get(id) === controller) relayControllers.delete(id);
   }
 }
@@ -153,15 +157,20 @@ async function cancelRelay(message: Record<string, unknown>): Promise<void> {
   const assignedSlot = slot(message.slot);
   const readToken = token(message.readToken, 43);
   const controller = new AbortController();
-  const response = await fetch(`${__SERVICE_ORIGIN__}/v1/${assignedSlot}/session/${id}`, {
-    method: "DELETE",
-    cache: "no-store",
-    credentials: "omit",
-    referrerPolicy: "no-referrer",
-    signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
-    headers: { "X-Read-Token": readToken }
-  });
-  if (!response.ok) throw new Error("cancel failed");
+  const clearDeadline = armDeadline(controller, Date.now() + 10_000);
+  try {
+    const response = await fetch(`${__SERVICE_ORIGIN__}/v1/${assignedSlot}/session/${id}`, {
+      method: "DELETE",
+      cache: "no-store",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      signal: controller.signal,
+      headers: { "X-Read-Token": readToken }
+    });
+    if (!response.ok) throw new Error("cancel failed");
+  } finally {
+    clearDeadline();
+  }
 }
 
 async function handleRelayMessage(message: Record<string, unknown>, sender: chrome.runtime.MessageSender): Promise<Record<string, unknown>> {

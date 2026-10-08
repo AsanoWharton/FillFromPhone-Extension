@@ -41,18 +41,27 @@ function responseReader(response: Response): ReadableStreamDefaultReader<Uint8Ar
   return response.body.getReader();
 }
 
-export function deadlineSignal(
+export function armDeadline(
   controller: AbortController,
   expiresAt: number,
   maximumLifetimeMs = Number.POSITIVE_INFINITY,
   now = Date.now()
-): AbortSignal {
+): () => void {
+  if (controller.signal.aborted) throw controller.signal.reason;
   const remaining = Math.min(expiresAt - now, maximumLifetimeMs);
   if (!Number.isFinite(remaining) || remaining <= 0) {
     controller.abort(new DOMException("Relay deadline elapsed", "TimeoutError"));
     throw controller.signal.reason;
   }
-  return AbortSignal.any([controller.signal, AbortSignal.timeout(Math.ceil(remaining))]);
+  const timer = globalThis.setTimeout(() => {
+    controller.abort(new DOMException("Relay deadline elapsed", "TimeoutError"));
+  }, Math.ceil(remaining));
+  const clear = (): void => globalThis.clearTimeout(timer);
+  controller.signal.addEventListener("abort", clear, { once: true });
+  return () => {
+    clear();
+    controller.signal.removeEventListener("abort", clear);
+  };
 }
 
 export async function readBoundedJson(

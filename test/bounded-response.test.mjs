@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  deadlineSignal,
+  armDeadline,
   readBoundedJson,
   readBoundedSse
 } from "../src/bounded-response.ts";
@@ -56,14 +56,23 @@ test("every SSE event counts toward the event budget", async () => {
 test("a fixed deadline aborts a slow stream", async () => {
   const controller = new AbortController();
   const response = new Response(new ReadableStream({ start() {} }));
-  const signal = deadlineSignal(controller, Date.now() + 20);
+  const clearDeadline = armDeadline(controller, Date.now() + 20);
   const keepAlive = setTimeout(() => undefined, 1_000);
   try {
-    await assert.rejects(() => readBoundedSse(response, controller, signal, () => undefined));
+    await assert.rejects(() => readBoundedSse(response, controller, controller.signal, () => undefined));
     assert.equal(controller.signal.aborted, true);
   } finally {
+    clearDeadline();
     clearTimeout(keepAlive);
   }
+});
+
+test("a cleared deadline does not abort a completed operation", async () => {
+  const controller = new AbortController();
+  const clearDeadline = armDeadline(controller, Date.now() + 10);
+  clearDeadline();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(controller.signal.aborted, false);
 });
 
 test("legitimate claimed and payload events survive arbitrary chunk boundaries", async () => {
