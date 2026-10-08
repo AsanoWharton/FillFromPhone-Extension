@@ -1,6 +1,13 @@
 declare const __SERVICE_ORIGIN__: string;
 export {};
 
+import {
+  deadlineSignal,
+  MAX_RESERVATION_RESPONSE_BYTES,
+  readBoundedJson,
+  readBoundedSse
+} from "./bounded-response.js";
+
 const MENU_ID = "fill-from-phone";
 const relayControllers = new Map<string, AbortController>();
 
@@ -46,12 +53,16 @@ function slot(value: unknown): "B" | "G" {
   return value;
 }
 
-async function reserveRelay(message: Record<string, unknown>): Promise<"B" | "G"> {
-  const id = token(message.id, 43);
-  const expiresAt = message.expiresAt;
-  if (!Number.isSafeInteger(expiresAt) || Number(expiresAt) <= Date.now() || Number(expiresAt) > Date.now() + 120_000) {
+function expiry(value: unknown): number {
+  if (!Number.isSafeInteger(value) || Number(value) <= Date.now() || Number(value) > Date.now() + 120_000) {
     throw new Error("invalid relay expiry");
   }
+  return Number(value);
+}
+
+async function reserveRelay(message: Record<string, unknown>): Promise<"B" | "G"> {
+  const id = token(message.id, 43);
+  const expiresAt = expiry(message.expiresAt);
   relayControllers.get(id)?.abort();
   const controller = new AbortController();
   relayControllers.set(id, controller);
@@ -67,12 +78,17 @@ async function reserveRelay(message: Record<string, unknown>): Promise<"B" | "G"
       cache: "no-store",
       credentials: "omit",
       referrerPolicy: "no-referrer",
-      signal: controller.signal,
+      signal: deadlineSignal(controller, expiresAt),
       headers: { "Content-Type": "application/json" },
       body
     });
     if (!response.ok) throw new Error("reserve failed");
-    const result = record(await response.json());
+    const result = record(await readBoundedJson(
+      response,
+      MAX_RESERVATION_RESPONSE_BYTES,
+      controller,
+      deadlineSignal(controller, expiresAt)
+    ));
     const assignedSlot = slot(result.slot);
     if (result.status !== "reserved") throw new Error("invalid reserve response");
     return assignedSlot;
@@ -86,47 +102,44 @@ async function waitForRelay(message: Record<string, unknown>, sender: chrome.run
   const id = token(message.id, 43);
   const assignedSlot = slot(message.slot);
   const readToken = token(message.readToken, 43);
+  const expiresAt = expiry(message.expiresAt);
   const controller = relayControllers.get(id) ?? new AbortController();
   relayControllers.set(id, controller);
   try {
+    const signal = deadlineSignal(controller, expiresAt);
     const response = await fetch(`${__SERVICE_ORIGIN__}/v1/${assignedSlot}/session/${id}/events`, {
       method: "GET",
       cache: "no-store",
       credentials: "omit",
       referrerPolicy: "no-referrer",
-      signal: controller.signal,
+      signal,
       headers: { "X-Read-Token": readToken }
     });
     if (!response.ok || !response.body) throw new Error("relay unavailable");
-    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let buffer = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += value;
-      let boundary: number;
-      while ((boundary = buffer.indexOf("\n\n")) >= 0) {
-        const event = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
-        if (event.startsWith("event: expired")) throw new Error("expired");
-        if (event.startsWith("event: claimed")) {
-          if (sender.tab?.id !== undefined) {
-            void chrome.tabs.sendMessage(
-              sender.tab.id,
-              { type: "FFP_RELAY_CLAIMED", id },
-              { frameId: sender.frameId ?? 0 }
-            ).catch(() => undefined);
-          }
-          continue;
+    return await readBoundedSse(response, controller, signal, (event) => {
+      const lines = event.replaceAll("\r\n", "\n").split("\n");
+      const eventNames = lines.filter((line) => line.startsWith("event:")).map((line) => line.slice(6).trimStart());
+      if (eventNames.length > 1) throw new Error("invalid event");
+      const eventName = eventNames[0];
+      if (eventName === undefined) return undefined;
+      if (eventName === "expired") throw new Error("expired");
+      if (eventName === "claimed") {
+        if (sender.tab?.id !== undefined) {
+          void chrome.tabs.sendMessage(
+            sender.tab.id,
+            { type: "FFP_RELAY_CLAIMED", id },
+            { frameId: sender.frameId ?? 0 }
+          ).catch(() => undefined);
         }
-        if (event.startsWith("event: payload")) {
-          const data = event.split("\n").find((line) => line.startsWith("data: "))?.slice(6);
-          if (!data) throw new Error("invalid event");
-          return envelope(JSON.parse(data));
-        }
+        return undefined;
       }
-    }
-    throw new Error("stream ended");
+      if (eventName !== "payload") return undefined;
+      const dataLines = lines.filter((line) => line.startsWith("data:"));
+      if (dataLines.length !== 1) throw new Error("invalid event");
+      const data = dataLines[0]!.slice(5).trimStart();
+      if (!data) throw new Error("invalid event");
+      return envelope(JSON.parse(data));
+    });
   } finally {
     if (relayControllers.get(id) === controller) relayControllers.delete(id);
   }
@@ -134,15 +147,18 @@ async function waitForRelay(message: Record<string, unknown>, sender: chrome.run
 
 async function cancelRelay(message: Record<string, unknown>): Promise<void> {
   const id = token(message.id, 43);
-  const assignedSlot = slot(message.slot);
-  const readToken = token(message.readToken, 43);
   relayControllers.get(id)?.abort();
   relayControllers.delete(id);
+  if (message.slot === undefined) return;
+  const assignedSlot = slot(message.slot);
+  const readToken = token(message.readToken, 43);
+  const controller = new AbortController();
   const response = await fetch(`${__SERVICE_ORIGIN__}/v1/${assignedSlot}/session/${id}`, {
     method: "DELETE",
     cache: "no-store",
     credentials: "omit",
     referrerPolicy: "no-referrer",
+    signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
     headers: { "X-Read-Token": readToken }
   });
   if (!response.ok) throw new Error("cancel failed");
