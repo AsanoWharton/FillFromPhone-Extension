@@ -216,6 +216,7 @@ async function startTransfer(): Promise<void> {
       try {
         assertTransferContext(active, fieldKind);
       } catch {
+        void cancel(active);
         return;
       }
       if (timer !== undefined) window.clearInterval(timer);
