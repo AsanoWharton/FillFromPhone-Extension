@@ -1,6 +1,13 @@
 import QRCode from "qrcode";
 import { bootstrapUrl, createDesktopTransaction, decryptEnvelope, type DesktopTransaction, type Envelope, type FieldKind } from "./protocol.js";
 import {
+  assertFieldTargetBinding,
+  bindFieldTarget,
+  injectBoundValue,
+  isEditableField,
+  type FieldTargetBinding
+} from "./target-binding.js";
+import {
   assertTransferActive,
   cancelTransfer,
   createTransferLifecycle,
@@ -13,9 +20,7 @@ declare const __SERVICE_ORIGIN__: string;
 interface ActiveTransfer {
   lifecycle: TransferLifecycle;
   transaction: DesktopTransaction;
-  target: HTMLElement;
-  documentRef: Document;
-  origin: string;
+  binding: FieldTargetBinding;
   overlay: HTMLElement;
 }
 
@@ -36,20 +41,6 @@ function deepestActiveElement(root: Document | ShadowRoot = document): Element |
   let active = root.activeElement;
   while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
   return active;
-}
-
-function isEditable(element: Element | null): element is HTMLElement {
-  if (!(element instanceof HTMLElement) || !element.isConnected) return false;
-  if (element instanceof HTMLTextAreaElement) return !element.disabled && !element.readOnly;
-  if (element instanceof HTMLInputElement) {
-    return ["text", "email", "password", "search", "tel", "url"].includes(element.type) && !element.disabled && !element.readOnly;
-  }
-  return element.isContentEditable;
-}
-
-function fieldKindFor(element: HTMLElement): FieldKind {
-  if (element instanceof HTMLInputElement) return element.type === "password" ? "password" : "short-text";
-  return "long-text";
 }
 
 function showNotice(message: string): void {
@@ -122,21 +113,6 @@ async function waitForEnvelope(transaction: DesktopTransaction): Promise<Envelop
   }
 }
 
-function inject(target: HTMLElement, plaintext: Uint8Array): void {
-  const value = new TextDecoder("utf-8", { fatal: true }).decode(plaintext);
-  const before = new InputEvent("beforeinput", { bubbles: true, cancelable: true, composed: true, inputType: "insertText", data: value });
-  if (!target.dispatchEvent(before)) throw new Error("insertion refused");
-  if (target instanceof HTMLInputElement) {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(target, value);
-  } else if (target instanceof HTMLTextAreaElement) {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(target, value);
-  } else {
-    target.textContent = value;
-  }
-  target.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: value }));
-  target.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-}
-
 async function cancel(active: ActiveTransfer): Promise<void> {
   cancelTransfer(active.lifecycle);
   active.overlay.remove();
@@ -153,16 +129,13 @@ async function cancel(active: ActiveTransfer): Promise<void> {
   }
 }
 
-function assertTransferContext(active: ActiveTransfer, fieldKind: FieldKind): void {
+function assertTransferContext(active: ActiveTransfer): void {
   assertTransferActive(
     active.lifecycle,
     runtime.__fillFromPhoneToken,
     active.transaction.bootstrap.expiresAt
   );
-  if (
-    document !== active.documentRef || location.origin !== active.origin ||
-    !active.target.isConnected || !isEditable(active.target) || fieldKindFor(active.target) !== fieldKind
-  ) throw new Error("target context changed");
+  assertFieldTargetBinding(active.binding);
 }
 
 function clearRuntimeIfOwned(lifecycle: TransferLifecycle): void {
@@ -178,7 +151,7 @@ async function startTransfer(): Promise<void> {
   runtime.__fillFromPhoneToken = token;
   previousCancel?.();
   const target = deepestActiveElement();
-  if (!isEditable(target)) {
+  if (!isEditableField(target)) {
     if (runtime.__fillFromPhoneToken === token) {
       delete runtime.__fillFromPhoneCancel;
       delete runtime.__fillFromPhoneClaimed;
@@ -198,8 +171,8 @@ async function startTransfer(): Promise<void> {
     showNotice("Fill from Phone requires a secure HTTPS page.");
     return;
   }
-  const fieldKind = fieldKindFor(target);
-  const documentRef = document;
+  const binding = bindFieldTarget(target);
+  const fieldKind = binding.fieldKind;
   const ui = overlayElement(fieldKind, location.host);
   document.documentElement.append(ui.host);
   const lifecycle = createTransferLifecycle(token);
@@ -209,12 +182,12 @@ async function startTransfer(): Promise<void> {
   try {
     const transaction = await createDesktopTransaction(origin, Date.now(), fieldKind);
     assertTransferActive(lifecycle, runtime.__fillFromPhoneToken, transaction.bootstrap.expiresAt);
-    active = { lifecycle, transaction, target, documentRef, origin, overlay: ui.host };
+    active = { lifecycle, transaction, binding, overlay: ui.host };
     runtime.__fillFromPhoneCancel = () => { if (active) void cancel(active); };
     runtime.__fillFromPhoneClaimed = (id) => {
       if (!active || active.transaction.bootstrap.id !== id) return;
       try {
-        assertTransferContext(active, fieldKind);
+        assertTransferContext(active);
       } catch {
         void cancel(active);
         return;
@@ -227,9 +200,9 @@ async function startTransfer(): Promise<void> {
     };
     ui.cancel.addEventListener("click", () => { if (active) void cancel(active); }, { once: true });
     await reserve(transaction);
-    assertTransferContext(active, fieldKind);
+    assertTransferContext(active);
     await QRCode.toCanvas(ui.canvas, bootstrapUrl(__SERVICE_ORIGIN__, transaction.bootstrap), { width: 320, margin: 4, errorCorrectionLevel: "M", color: { dark: "#0d514e", light: "#ffffff" } });
-    assertTransferContext(active, fieldKind);
+    assertTransferContext(active);
     ui.status.textContent = "Scan to continue on your phone";
     const updateTimer = (): void => {
       const seconds = Math.max(0, Math.ceil((transaction.bootstrap.expiresAt - Date.now()) / 1_000));
@@ -241,7 +214,7 @@ async function startTransfer(): Promise<void> {
     timer = window.setInterval(updateTimer, 250);
     const envelope = await waitForEnvelope(transaction);
     if (timer !== undefined) window.clearInterval(timer);
-    assertTransferContext(active, fieldKind);
+    assertTransferContext(active);
     const plaintext = await decryptEnvelope(transaction, envelope);
     releasePlaintext(
       lifecycle,
@@ -249,8 +222,8 @@ async function startTransfer(): Promise<void> {
       transaction.bootstrap.expiresAt,
       plaintext,
       () => {
-        assertTransferContext(active!, fieldKind);
-        inject(target, plaintext);
+        assertTransferContext(active!);
+        injectBoundValue(binding, plaintext, () => assertTransferContext(active!));
       }
     );
     ui.status.textContent = "Filled";

@@ -15,7 +15,7 @@ test("packaged extension contains only the reviewed runtime files", async () => 
 test("manifest retains the minimum permission set", async () => {
   const manifest = JSON.parse(await readFile(new URL("../dist/manifest.json", import.meta.url), "utf8"));
   assert.deepEqual(manifest.permissions.sort(), ["activeTab", "contextMenus", "scripting"]);
-  assert.equal(manifest.version, "0.6.4");
+  assert.equal(manifest.version, "0.6.5");
   assert.deepEqual(manifest.host_permissions, ["https://fillfromphone.com/*"]);
   assert.equal(manifest.action.default_popup, "popup.html");
   assert.deepEqual(manifest.icons, { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" });
@@ -33,7 +33,7 @@ test("extension icon has the required dimensions and transparent padding", async
 
 test("versioned and generic release archives are byte-identical", async () => {
   const genericArchive = await readFile(new URL("../release/fill-from-phone-extension.zip", import.meta.url));
-  const versionedArchive = await readFile(new URL("../release/fill-from-phone-0.6.4-chrome-web-store.zip", import.meta.url));
+  const versionedArchive = await readFile(new URL("../release/fill-from-phone-0.6.5-chrome-web-store.zip", import.meta.url));
   assert.ok(genericArchive.byteLength > 0);
   assert.deepEqual(versionedArchive, genericArchive);
 });
@@ -65,18 +65,23 @@ test("only the extension service worker performs relay networking", async () => 
   assert.doesNotMatch(backgroundSource, /\.then\(/u);
 });
 
-test("terminal transfer state and transport budgets guard the plaintext sink", async () => {
-  const [backgroundSource, contentSource, popupSource, boundedSource] = await Promise.all([
+test("terminal transfer state, exact target binding, and transport budgets guard the plaintext sink", async () => {
+  const [backgroundSource, contentSource, popupSource, boundedSource, bindingSource] = await Promise.all([
     readFile(new URL("../src/background.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/content.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/popup.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/bounded-response.ts", import.meta.url), "utf8")
+    readFile(new URL("../src/bounded-response.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/target-binding.ts", import.meta.url), "utf8")
   ]);
   const decryptIndex = contentSource.indexOf("const plaintext = await decryptEnvelope");
   const releaseIndex = contentSource.indexOf("releasePlaintext(", decryptIndex);
-  const contextIndex = contentSource.indexOf("assertTransferContext(active!, fieldKind)", releaseIndex);
-  const injectIndex = contentSource.indexOf("inject(target, plaintext)", contextIndex);
+  const contextIndex = contentSource.indexOf("assertTransferContext(active!)", releaseIndex);
+  const injectIndex = contentSource.indexOf("injectBoundValue(binding, plaintext", contextIndex);
   assert.ok(decryptIndex >= 0 && releaseIndex > decryptIndex && contextIndex > releaseIndex && injectIndex > contextIndex);
+  const dispatchIndex = bindingSource.indexOf("target.dispatchEvent(before)");
+  const revalidateIndex = bindingSource.indexOf("revalidate();", dispatchIndex);
+  const writeIndex = bindingSource.indexOf("HTMLInputElement.prototype", revalidateIndex);
+  assert.ok(dispatchIndex >= 0 && revalidateIndex > dispatchIndex && writeIndex > revalidateIndex);
   const failureIndex = contentSource.indexOf("} catch {", injectIndex);
   const cancelIndex = contentSource.indexOf("if (active) await cancel(active)", failureIndex);
   const cleanupIndex = contentSource.indexOf("clearRuntimeIfOwned(lifecycle)", cancelIndex);
