@@ -9,7 +9,7 @@ This repository contains the Manifest V3 Chrome receiver for Fill from Phone. It
 - The test-page marker carries no identifier or authority.
 - There is no remote code, analytics, persistent storage permission, or externally connectable surface.
 
-Field type is classified locally as `short-text`, `long-text`, or `password`, authenticated end to end, and omitted from relay requests.
+Field type is classified locally as `short-text`, `long-text`, or `password`, authenticated end to end, and omitted from relay requests. Before insertion, the extension revalidates the exact selected element, focus, composed DOM ancestry, form association, field classification, and credential-relevant attributes after the page-controlled `beforeinput` event.
 
 ## Build and verify
 

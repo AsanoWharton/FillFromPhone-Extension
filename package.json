@@ -1,6 +1,6 @@
 {
   "name": "@fill-from-phone/extension",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
@@ -17,6 +17,7 @@
     "@types/qrcode": "^1.5.5",
     "esbuild": "^0.25.0",
     "fflate": "^0.8.2",
+    "playwright": "1.63.0",
     "qrcode": "^1.5.4",
     "typescript": "^5.9.0"
   },

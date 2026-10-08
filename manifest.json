@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fill from Phone",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Transfer one value from a phone into one selected field with end-to-end encryption.",
   "icons": {
     "16": "icon-16.png",
