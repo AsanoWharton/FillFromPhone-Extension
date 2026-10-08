@@ -75,6 +75,10 @@ test("terminal transfer state and transport budgets guard the plaintext sink", a
   const contextIndex = contentSource.indexOf("assertTransferContext(active!, fieldKind)", releaseIndex);
   const injectIndex = contentSource.indexOf("inject(target, plaintext)", contextIndex);
   assert.ok(decryptIndex >= 0 && releaseIndex > decryptIndex && contextIndex > releaseIndex && injectIndex > contextIndex);
+  const failureIndex = contentSource.indexOf("} catch {", injectIndex);
+  const cancelIndex = contentSource.indexOf("if (active) await cancel(active)", failureIndex);
+  const cleanupIndex = contentSource.indexOf("clearRuntimeIfOwned(lifecycle)", cancelIndex);
+  assert.ok(failureIndex > injectIndex && cancelIndex > failureIndex && cleanupIndex > cancelIndex);
   assert.match(contentSource, /expiresAt: transaction\.bootstrap\.expiresAt/u);
   assert.match(backgroundSource, /readBoundedJson\(/u);
   assert.match(backgroundSource, /readBoundedSse\(/u);

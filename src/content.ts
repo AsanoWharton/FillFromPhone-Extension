@@ -258,11 +258,11 @@ async function startTransfer(): Promise<void> {
     active = undefined;
     clearRuntimeIfOwned(lifecycle);
   } catch {
-    if (!lifecycle.controller.signal.aborted && runtime.__fillFromPhoneToken === token) {
-      ui.status.textContent = "Transfer stopped";
-      ui.timer.textContent = "Start a new transfer and try again.";
-      window.setTimeout(() => ui.host.remove(), 2_500);
-    } else ui.host.remove();
+    const owned = runtime.__fillFromPhoneToken === token;
+    if (active) await cancel(active);
+    else cancelTransfer(lifecycle);
+    ui.host.remove();
+    if (owned) showNotice("Transfer stopped. Start a new transfer and try again.");
   } finally {
     if (timer !== undefined) window.clearInterval(timer);
     clearRuntimeIfOwned(lifecycle);

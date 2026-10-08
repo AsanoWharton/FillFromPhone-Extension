@@ -57,8 +57,13 @@ test("a fixed deadline aborts a slow stream", async () => {
   const controller = new AbortController();
   const response = new Response(new ReadableStream({ start() {} }));
   const signal = deadlineSignal(controller, Date.now() + 20);
-  await assert.rejects(() => readBoundedSse(response, controller, signal, () => undefined));
-  assert.equal(controller.signal.aborted, true);
+  const keepAlive = setTimeout(() => undefined, 1_000);
+  try {
+    await assert.rejects(() => readBoundedSse(response, controller, signal, () => undefined));
+    assert.equal(controller.signal.aborted, true);
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
 
 test("legitimate claimed and payload events survive arbitrary chunk boundaries", async () => {
