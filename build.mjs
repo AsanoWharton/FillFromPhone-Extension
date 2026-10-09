@@ -4,7 +4,7 @@ import { Resvg } from "@resvg/resvg-js";
 import { build } from "esbuild";
 import { zipSync } from "fflate";
 
-const productionOrigin = "https://fillfromphone.com";
+const productionOrigin = "https://remotefill.com";
 const serviceOrigin = process.env.SERVICE_ORIGIN ?? productionOrigin;
 const parsedOrigin = new URL(serviceOrigin);
 if (parsedOrigin.origin !== serviceOrigin || !["https:", "http:"].includes(parsedOrigin.protocol)) throw new Error("invalid SERVICE_ORIGIN");

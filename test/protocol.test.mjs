@@ -50,7 +50,7 @@ test("phone and extension complete an authenticated round trip", async () => {
 test("QR URL uses an exact 256-bit route and no common /f endpoint", async () => {
   const transaction = await createDesktopTransaction("https://accounts.example.com", 1_000);
   transaction.bootstrap.slot = "G";
-  const url = new URL(bootstrapUrl("https://fillfromphone.com", transaction.bootstrap));
+  const url = new URL(bootstrapUrl("https://remotefill.com", transaction.bootstrap));
   assert.match(url.pathname, /^\/t\/[A-Za-z0-9_-]{43}$/u);
   assert.equal(url.pathname.slice(3), transaction.bootstrap.id);
   assert.ok(url.hash.length > 1);

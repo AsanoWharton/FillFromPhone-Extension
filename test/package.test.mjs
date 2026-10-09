@@ -16,11 +16,11 @@ test("manifest retains the minimum permission set", async () => {
   const manifest = JSON.parse(await readFile(new URL("../dist/manifest.json", import.meta.url), "utf8"));
   assert.deepEqual(manifest.permissions.sort(), ["activeTab", "contextMenus", "scripting"]);
   assert.equal(manifest.version, "0.7.0");
-  assert.deepEqual(manifest.host_permissions, ["https://fillfromphone.com/*"]);
+  assert.deepEqual(manifest.host_permissions, ["https://remotefill.com/*"]);
   assert.equal(manifest.action.default_popup, "popup.html");
   assert.deepEqual(manifest.icons, { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" });
   assert.deepEqual(manifest.action.default_icon, { "16": "icon-16.png", "32": "icon-32.png" });
-  assert.deepEqual(manifest.content_scripts, [{ matches: ["https://fillfromphone.com/test"], js: ["presence.js"], run_at: "document_start" }]);
+  assert.deepEqual(manifest.content_scripts, [{ matches: ["https://remotefill.com/test"], js: ["presence.js"], run_at: "document_start" }]);
   assert.equal(manifest.externally_connectable, undefined);
 });
 
@@ -41,7 +41,7 @@ test("versioned and generic release archives are byte-identical", async () => {
 test("first install opens the same-origin test page", async () => {
   const background = await readFile(new URL("../dist/background.js", import.meta.url), "utf8");
   const presence = await readFile(new URL("../dist/presence.js", import.meta.url), "utf8");
-  assert.equal(background.includes("https://fillfromphone.com/test"), true);
+  assert.equal(background.includes("https://remotefill.com/test"), true);
   assert.match(background, /reason===?"install"/u);
   assert.match(presence, /data-fill-from-phone-extension/u);
   assert.doesNotMatch(presence, /fetch\(|XMLHttpRequest|chrome\.runtime|chrome\.tabs|chrome\.scripting|localStorage|sessionStorage|indexedDB/u);

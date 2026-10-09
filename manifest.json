@@ -10,13 +10,13 @@
     "128": "icon-128.png"
   },
   "permissions": ["activeTab", "contextMenus", "scripting"],
-  "host_permissions": ["https://fillfromphone.com/*"],
+  "host_permissions": ["https://remotefill.com/*"],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://fillfromphone.com/test"],
+      "matches": ["https://remotefill.com/test"],
       "js": ["presence.js"],
       "run_at": "document_start"
     }
