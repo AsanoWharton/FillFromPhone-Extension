@@ -19,7 +19,7 @@
     "fflate": "^0.8.2",
     "playwright": "1.63.0",
     "qrcode": "^1.5.4",
-    "typescript": "^5.9.0"
+    "typescript": "^7.0.2"
   },
   "allowScripts": {
     "esbuild@0.25.12": true
