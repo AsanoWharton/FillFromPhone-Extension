@@ -4,7 +4,7 @@ import test from "node:test";
 import { unzipSync } from "fflate";
 
 test("packaged extension contains only the reviewed runtime files", async () => {
-  const archive = new Uint8Array(await readFile(new URL("../release/fill-from-phone-extension.zip", import.meta.url)));
+  const archive = new Uint8Array(await readFile(new URL("../release/remote-fill-extension.zip", import.meta.url)));
   const unpacked = unzipSync(archive);
   const entries = Object.keys(unpacked).sort();
   assert.deepEqual(entries, ["LICENSE-dijkstrajs.txt", "LICENSE-font-awesome.txt", "LICENSE-public-sans.txt", "LICENSE-qrcode.txt", "PROPRIETARY-NOTICE.txt", "background.js", "content.js", "icon-128.png", "icon-16.png", "icon-32.png", "icon-48.png", "manifest.json", "popup.css", "popup.html", "popup.js", "presence.js", "public-sans-400.woff2", "public-sans-700.woff2"]);
@@ -15,7 +15,7 @@ test("packaged extension contains only the reviewed runtime files", async () => 
 test("manifest retains the minimum permission set", async () => {
   const manifest = JSON.parse(await readFile(new URL("../dist/manifest.json", import.meta.url), "utf8"));
   assert.deepEqual(manifest.permissions.sort(), ["activeTab", "contextMenus", "scripting"]);
-  assert.equal(manifest.version, "0.6.5");
+  assert.equal(manifest.version, "0.7.0");
   assert.deepEqual(manifest.host_permissions, ["https://fillfromphone.com/*"]);
   assert.equal(manifest.action.default_popup, "popup.html");
   assert.deepEqual(manifest.icons, { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" });
@@ -32,8 +32,8 @@ test("extension icon has the required dimensions and transparent padding", async
 });
 
 test("versioned and generic release archives are byte-identical", async () => {
-  const genericArchive = await readFile(new URL("../release/fill-from-phone-extension.zip", import.meta.url));
-  const versionedArchive = await readFile(new URL("../release/fill-from-phone-0.6.5-chrome-web-store.zip", import.meta.url));
+  const genericArchive = await readFile(new URL("../release/remote-fill-extension.zip", import.meta.url));
+  const versionedArchive = await readFile(new URL("../release/remote-fill-0.7.0-chrome-web-store.zip", import.meta.url));
   assert.ok(genericArchive.byteLength > 0);
   assert.deepEqual(versionedArchive, genericArchive);
 });
@@ -58,7 +58,7 @@ test("only the extension service worker performs relay networking", async () => 
   assert.match(content, /Short text field/u);
   assert.match(content, /Long text field/u);
   assert.match(content, /Password field/u);
-  assert.match(content, /Fill from Phone/u);
+  assert.match(content, /Remote Fill/u);
   assert.doesNotMatch(content, /Secure device handoff|class="key"/u);
   assert.equal((backgroundSource.match(/token\((?:message|candidate)\.id, 43\)/gu) ?? []).length, 4);
   assert.doesNotMatch(backgroundSource, /token\((?:message|candidate)\.id, 46\)/u);

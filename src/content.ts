@@ -62,7 +62,7 @@ function overlayElement(fieldKind: FieldKind, destination: string): { host: HTML
   const shadow = host.attachShadow({ mode: "closed" });
   shadow.innerHTML = `<style>
     :host{all:initial}*{box-sizing:border-box}.panel{width:min(23rem,calc(100vw - 2rem));padding:0 1.35rem 1.35rem;border:1px solid #cbc8bf;border-top:.45rem solid #146c68;border-radius:.6rem;background:#fff;color:#222522;box-shadow:0 1rem 4rem rgb(0 0 0 / .28);font:14px/1.45 system-ui,-apple-system,sans-serif;text-align:center}.titlebar{display:flex;align-items:center;justify-content:center;margin:0 -1.35rem 1rem;padding:.85rem 1.35rem;background:#deeeea;color:#0d514e}.titlebar h2{margin:0;font:800 19px/1.2 system-ui,-apple-system,sans-serif}.classification{display:inline-block;margin:0 0 .35rem;padding:.2rem .5rem;border-radius:.2rem;background:#deeeea;color:#0d514e;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.destination{margin:.1rem 0 .75rem;color:#5c635e;font-weight:650;overflow-wrap:anywhere}canvas{display:block;width:min(320px,100%);height:auto;margin:.5rem auto;padding:.35rem;border:1px solid #cbc8bf;border-radius:.55rem;background:#fff}.status{margin:.75rem 0 .2rem;font-weight:800;color:#0d514e}.timer{margin:.2rem 0;color:#5c635e;font-variant-numeric:tabular-nums}button{margin-top:.75rem;border:2px solid #146c68;border-radius:.35rem;padding:.55rem .9rem;background:#fff;color:#0d514e;font:700 14px/1.2 system-ui,-apple-system,sans-serif;cursor:pointer}button:hover{background:#deeeea}button:focus{outline:4px solid #f2b84b;outline-offset:2px}
-  </style><section class="panel" role="dialog" aria-modal="true" aria-labelledby="ffp-title"><div class="titlebar"><h2 id="ffp-title">Fill from Phone</h2></div><p class="classification"></p><p class="destination"></p><canvas width="320" height="320" aria-label="One-time transfer QR code"></canvas><p class="status">Preparing one-time code…</p><p class="timer"></p><button type="button">Cancel</button></section>`;
+  </style><section class="panel" role="dialog" aria-modal="true" aria-labelledby="ffp-title"><div class="titlebar"><h2 id="ffp-title">Remote Fill</h2></div><p class="classification"></p><p class="destination"></p><canvas width="320" height="320" aria-label="One-time transfer QR code"></canvas><p class="status">Preparing one-time code…</p><p class="timer"></p><button type="button">Cancel</button></section>`;
   shadow.querySelector<HTMLElement>(".classification")!.textContent = fieldKind === "password" ? "Password field" : fieldKind === "long-text" ? "Long text field" : "Short text field";
   shadow.querySelector<HTMLElement>(".destination")!.textContent = `Destination: ${destination}`;
   return {
@@ -157,7 +157,7 @@ async function startTransfer(): Promise<void> {
       delete runtime.__fillFromPhoneClaimed;
       delete runtime.__fillFromPhoneToken;
     }
-    showNotice("Focus a supported text field, then try Fill from Phone again.");
+    showNotice("Focus a supported text field, then try Remote Fill again.");
     return;
   }
   const origin = location.origin;
@@ -168,7 +168,7 @@ async function startTransfer(): Promise<void> {
       delete runtime.__fillFromPhoneClaimed;
       delete runtime.__fillFromPhoneToken;
     }
-    showNotice("Fill from Phone requires a secure HTTPS page.");
+    showNotice("Remote Fill requires a secure HTTPS page.");
     return;
   }
   const binding = bindFieldTarget(target);

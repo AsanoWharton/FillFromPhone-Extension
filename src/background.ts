@@ -8,7 +8,7 @@ import {
   readBoundedSse
 } from "./bounded-response.js";
 
-const MENU_ID = "fill-from-phone";
+const MENU_ID = "remote-fill";
 const relayControllers = new Map<string, AbortController>();
 
 interface RelayEnvelope {
@@ -191,7 +191,7 @@ function installMenu(): void {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_ID,
-      title: "Fill from Phone",
+      title: "Remote Fill",
       contexts: ["editable"]
     });
   });

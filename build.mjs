@@ -96,6 +96,6 @@ const packageEntries = Object.fromEntries(await Promise.all(packageNames.map(asy
 ])));
 const archive = zipSync(packageEntries, { level: 9 });
 await Promise.all([
-  writeFile(new URL("./release/fill-from-phone-extension.zip", import.meta.url), archive),
-  writeFile(new URL(`./release/fill-from-phone-${manifest.version}-chrome-web-store.zip`, import.meta.url), archive)
+  writeFile(new URL("./release/remote-fill-extension.zip", import.meta.url), archive),
+  writeFile(new URL(`./release/remote-fill-${manifest.version}-chrome-web-store.zip`, import.meta.url), archive)
 ]);

@@ -1,4 +1,4 @@
-Fill from Phone application code, protocol implementation, documentation,
+Remote Fill application code, protocol implementation, documentation,
 visual assets, and product-specific materials are proprietary. All rights are
 reserved. No license to copy, modify, redistribute, sublicense, create
 derivative works from, or commercially use those materials is granted except
@@ -9,4 +9,4 @@ a separate written agreement. Contact contact@asanowharton.com for licensing
 inquiries.
 
 Third-party components remain subject to the separate license files included
-with this package. Those licenses do not license Fill from Phone itself.
+with this package. Those licenses do not license Remote Fill itself.

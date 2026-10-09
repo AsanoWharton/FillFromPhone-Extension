@@ -1,6 +1,6 @@
-# Fill from Phone Extension
+# Remote Fill Extension
 
-This repository contains the Manifest V3 Chrome receiver for Fill from Phone. It binds one user-selected editable field, establishes an end-to-end encrypted transfer, inserts one returned value, and never submits the destination form.
+This repository contains the Manifest V3 Chrome receiver for Remote Fill. It binds one user-selected editable field, establishes an end-to-end encrypted transfer, inserts one returned value, and never submits the destination form.
 
 ## Boundaries
 
@@ -25,7 +25,7 @@ npm audit --audit-level=high
 
 ## Related implementation
 
-The relay and phone endpoint are in [FillFromPhone-Core](https://github.com/AsanoWharton/FillFromPhone-Core). Website code is in [FillFromPhone-Site](https://github.com/AsanoWharton/FillFromPhone-Site).
+The relay and phone endpoint are in [RemoteFill-Core](https://github.com/AsanoWharton/RemoteFill-Core). Website code is in [RemoteFill-Site](https://github.com/AsanoWharton/RemoteFill-Site).
 
 ## Ownership
 

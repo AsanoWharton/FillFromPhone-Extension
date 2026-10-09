@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Fill from Phone",
-  "version": "0.6.5",
+  "name": "Remote Fill",
+  "version": "0.7.0",
   "description": "Transfer one value from a phone into one selected field with end-to-end encryption.",
   "icons": {
     "16": "icon-16.png",
@@ -22,7 +22,7 @@
     }
   ],
   "action": {
-    "default_title": "Fill from Phone",
+    "default_title": "Remote Fill",
     "default_icon": {
       "16": "icon-16.png",
       "32": "icon-32.png"
